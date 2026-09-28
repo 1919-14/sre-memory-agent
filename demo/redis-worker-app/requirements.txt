@@ -1,0 +1,5 @@
+# The delivery worker intentionally has no runtime dependencies:
+# it must be runnable inside a network-isolated sandbox.
+#
+# Development / test only:
+pytest>=8.3
