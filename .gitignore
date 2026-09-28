@@ -1,0 +1,67 @@
+# SRE Memory Agent — agent workspace files.
+# NOTE: .env is intentionally unchecked. Never commit credentials.
+
+# ── Secrets ──────────────────────────────────────────────────
+# `.env` holds the live GROQ_API_KEY. It is ignored explicitly, not just left untracked:
+# without this rule a `git add -A` would commit a real credential.
+.env
+.env.local
+.env.*.local
+.venv
+.venv.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/*.egg-info/
+*.egg
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Runtime data (generated) ─────────────────────────────────
+data/
+!data/.gitkeep
+*.db
+*.sqlite3
+logs/
+*.log
+
+# ── Sandbox / temp ───────────────────────────────────────────
+.sandbox/
+sandbox_tmp/
+tmp/
+*.patch.tmp
+
+# ── Node / tooling (docs skill, mcp helpers) ─────────────────
+node_modules/
+.npm/
+
+# ── Editors / OS ─────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── frontend ───────────────────────────────────────────────
+# node_modules is reproducible from package.json; dist is a build artefact that
+# FastAPI serves when present, so it is rebuilt rather than committed.
+web/node_modules/
+web/dist/
+web/.vite/
+*.tsbuildinfo
