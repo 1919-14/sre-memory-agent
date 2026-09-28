@@ -1,0 +1,207 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────
+   Baselayer — Swiss International style.
+   Flatness with pattern-derived depth. No shadows, no radius.
+   ───────────────────────────────────────────────────────────── */
+
+@layer base {
+  :root {
+    /* The single source of truth for the few values Tailwind cannot express. */
+    --swiss-rule: 2px;
+    --swiss-rule-heavy: 4px;
+    --swiss-hairline: rgba(0, 0, 0, 0.14);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans text-body antialiased;
+    font-feature-settings: 'cv11' 1, 'ss01' 1;
+  }
+
+  /* Numerals must align in tables and metrics. */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-black uppercase tracking-tighter;
+  }
+
+  /* Visible, high-contrast keyboard focus. No glow rings. */
+  :focus-visible {
+    outline: 2px solid #ff3000;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: #ff3000;
+    color: #ffffff;
+  }
+
+  /* Slim, neutral scrollbars so dense panels do not feel heavy. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.28) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.22);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Motion is a state signal, never decoration. Honour the OS preference. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* ── pattern textures: depth without shadows ─────────────── */
+
+  .swiss-grid-pattern {
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .swiss-dots {
+    background-image: radial-gradient(rgba(0, 0, 0, 0.09) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  .swiss-diagonal {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.045) 0px,
+      rgba(0, 0, 0, 0.045) 1px,
+      transparent 1px,
+      transparent 10px
+    );
+  }
+
+  .swiss-noise {
+    position: relative;
+  }
+
+  .swiss-noise::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.015;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── structural rules ────────────────────────────────────── */
+
+  .rule-t {
+    @apply border-t-2 border-ink;
+  }
+
+  .rule-b {
+    @apply border-b-2 border-ink;
+  }
+
+  .rule-heavy-t {
+    border-top-width: 4px;
+    border-color: #000;
+  }
+
+  /* The grid must be visible: vertical separators between columns. */
+  .col-rule {
+    @apply border-ink;
+    border-left-width: 2px;
+  }
+
+  /* ── the numbered section label (01. System) ─────────────── */
+  .section-label {
+    @apply flex items-baseline gap-3 text-label font-black uppercase tracking-widest text-accent;
+  }
+
+  /* ── navigation link ─────────────────────────────────────── */
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-3 text-meta font-bold uppercase tracking-wide;
+    transition:
+      background-color 150ms linear,
+      color 150ms linear;
+  }
+
+  .nav-link:hover {
+    @apply bg-muted;
+  }
+
+  /* The marker is a signal, not decoration: it appears only for the current section. */
+  .nav-link[data-active='true'] {
+    @apply bg-ink text-paper;
+  }
+
+  /* ── inputs ──────────────────────────────────────────────── */
+  .swiss-input {
+    @apply w-full border-2 border-ink bg-paper px-3 py-2 text-meta font-medium text-ink
+      placeholder:font-normal placeholder:text-status-idle;
+    transition: border-color 120ms linear;
+  }
+
+  .swiss-input:focus {
+    outline: none;
+    border-color: #ff3000;
+  }
+
+  /* ── code / diff surfaces ────────────────────────────────── */
+  .code-surface {
+    @apply overflow-auto bg-ink text-paper font-mono text-micro leading-relaxed;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Clamp long memory excerpts and error text inside dense rows. */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
