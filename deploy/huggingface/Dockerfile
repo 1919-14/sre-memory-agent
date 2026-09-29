@@ -26,9 +26,25 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # at the failing revision, reads commit metadata, and reverts to the last known good commit
 # during rollback. `curl` is the container healthcheck and the memory server's readiness
 # probe. `util-linux` provides `setpriv`, which drops privileges for the memory server.
+# `openssh-client` is for the sandbox: the Docker CLI's `ssh://` transport shells out to `ssh`,
+# which is how a daemon elsewhere is reached without managing certificates.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git curl ca-certificates util-linux \
+    && apt-get install -y --no-install-recommends git curl ca-certificates util-linux openssh-client \
     && rm -rf /var/lib/apt/lists/*
+
+# The Docker *client*, and only the client. A Space cannot run a daemon — that needs privileged
+# mode or the host socket, and Spaces provide neither — but generated code still has to be
+# isolated, so the sandbox talks to a daemon elsewhere through `DOCKER_HOST` (see step 3 of
+# `entrypoint.sh`). With no daemon configured, the agent reports the local backend as the
+# degradation it is rather than calling it isolation.
+#
+# x86_64 because that is what every Space's cpu-basic/free tier is; the static CLI is used
+# instead of `apt-get install docker.io`, which would also pull the daemon and its dependencies
+# into the image for nothing.
+ARG DOCKER_CLI_VERSION=27.3.1
+RUN curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLI_VERSION}.tgz" \
+    | tar -xz --strip-components=1 -C /usr/local/bin docker/docker \
+    && docker --version
 
 WORKDIR /app
 

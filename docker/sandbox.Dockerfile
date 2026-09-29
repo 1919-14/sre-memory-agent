@@ -1,14 +1,22 @@
 # Sandbox image for the SRE Memory Agent.
 #
 # Generated code is executed here and nowhere else. The container contract is fixed by
-# `src/sre_agent/sandbox/backends.py`, which runs:
+# `src/sre_agent/sandbox/backends.py`, which builds one of two commands depending on whether
+# the daemon shares this filesystem:
 #
+#   # a daemon that can see the workspace (local Docker): mounted read-only in practice
 #   docker run --rm --network none --memory 1g --cpus 2 --pids-limit 256 \
 #     -v <workspace>:/workspace -w /workspace <this image> python -m pytest -q ...
 #
-# so this image only has to provide a Python interpreter with pytest, a writable working
-# directory, and nothing else. Isolation itself (no network, resource caps, no access to
-# the host beyond the mounted workspace) is enforced by the `docker run` flags above, not
+#   # a daemon that cannot (remote DOCKER_HOST): the workspace is streamed in on stdin and
+#   # extracted into an ephemeral tmpfs, never touching the daemon's disk
+#   docker run -i --rm ... --tmpfs /workspace:rw,size=512m,mode=1777 -w /workspace \
+#     <this image> python -c '<extract stdin, then exec>' python -m pytest -q ...
+#
+# Either way this image only has to provide a Python interpreter with pytest: the streamed
+# archive is unpacked by that interpreter's own stdlib rather than by tar(1), which is why
+# there is nothing else in here. Isolation itself (no network, resource caps, and no access
+# to the host beyond what is mounted or streamed) is enforced by the `docker run` flags, not
 # by anything in this file.
 #
 # The demo service under repair is standard-library only, so pytest is the sole dependency.

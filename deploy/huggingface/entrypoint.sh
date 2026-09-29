@@ -45,12 +45,56 @@ if [ -d "$APP_DIR/data/runs" ]; then
   [ "$seeded" -gt 0 ] && log "seeded $seeded recorded trajectories into /data/runs"
 fi
 
-# ── 3. capability defaults ───────────────────────────────────────────────────
-# A Space has no Docker daemon, so generated code cannot be run in the container backend.
-# `local` states that plainly; `auto` would reach the same backend but also log a downgrade
-# warning. The sandbox is a real isolation boundary in the documented setup, so the
-# dashboard is left to report this as the degradation it is rather than hiding it.
-export SANDBOX_BACKEND="${SANDBOX_BACKEND:-local}"
+# ── 3. sandbox ───────────────────────────────────────────────────────────────
+# A Space cannot run a Docker daemon (that needs privileged mode or the host socket, neither of
+# which Spaces provide), so container isolation comes from a daemon *elsewhere*, reached with
+# the Docker CLI's own `DOCKER_HOST`. Everything below only materialises credentials; the
+# address itself is passed straight through as a Space variable or secret.
+#
+# `auto` is deliberately the default rather than `local`: it uses the container backend when a
+# daemon answers and says why it could not when none does, so the dashboard reports a real
+# downgrade instead of a silent one. Nothing here claims isolation the run did not have.
+export SANDBOX_BACKEND="${SANDBOX_BACKEND:-auto}"
+
+if [ -n "${DOCKER_SSH_KEY:-}" ]; then
+  # `ssh://` transport: the Docker CLI shells out to `ssh`, which reads the default identity
+  # from ~/.ssh. Written here rather than baked into the image because it is a credential.
+  mkdir -p /root/.ssh && chmod 700 /root/.ssh
+  printf '%s\n' "$DOCKER_SSH_KEY" > /root/.ssh/id_rsa
+  chmod 600 /root/.ssh/id_rsa
+  # The daemon host is not known in advance, so its key cannot be pinned. accept-new still
+  # refuses a *changed* key, which is the attack that matters.
+  printf 'Host *\n  StrictHostKeyChecking accept-new\n' > /root/.ssh/config
+  chmod 600 /root/.ssh/config
+  log "DOCKER_SSH_KEY set: the sandbox can reach a daemon over ssh://"
+fi
+
+if [ -n "${DOCKER_CA_CERT:-}" ] || [ -n "${DOCKER_CLIENT_CERT:-}" ] || [ -n "${DOCKER_CLIENT_KEY:-}" ]; then
+  # `tcp://` transport: the Docker CLI expects ca.pem/cert.pem/key.pem in DOCKER_CERT_PATH.
+  # The PEM bodies arrive as secrets, so they are written to files under /data — the only path
+  # a Space preserves — and never inlined into the image.
+  mkdir -p /data/.docker && chmod 700 /data/.docker
+  [ -n "${DOCKER_CA_CERT:-}" ] && printf '%s\n' "$DOCKER_CA_CERT" > /data/.docker/ca.pem
+  [ -n "${DOCKER_CLIENT_CERT:-}" ] && printf '%s\n' "$DOCKER_CLIENT_CERT" > /data/.docker/cert.pem
+  [ -n "${DOCKER_CLIENT_KEY:-}" ] && printf '%s\n' "$DOCKER_CLIENT_KEY" > /data/.docker/key.pem
+  chmod 600 /data/.docker/*.pem 2>/dev/null || true
+  export DOCKER_CERT_PATH=/data/.docker
+  export DOCKER_TLS_VERIFY="${DOCKER_TLS_VERIFY:-1}"
+  log "Docker TLS certificates written to $DOCKER_CERT_PATH (DOCKER_TLS_VERIFY=$DOCKER_TLS_VERIFY)"
+  # A PEM that lost its newlines on the way into a secret is the usual cause of a TLS
+  # handshake failure, and it is silent otherwise. Say so at boot instead.
+  for pem in ca cert key; do
+    if [ -f "/data/.docker/$pem.pem" ] && ! head -c 20 "/data/.docker/$pem.pem" | grep -q -- '-----BEGIN'; then
+      log "WARNING: $pem.pem does not start with '-----BEGIN' — check that the secret kept its line breaks"
+    fi
+  done
+fi
+
+if [ -n "${DOCKER_HOST:-}" ]; then
+  log "sandbox daemon: $DOCKER_HOST (generated code runs in a container there)"
+else
+  log "no DOCKER_HOST: the sandbox falls back to the local backend and reports it as a degradation"
+fi
 
 # Memory defaults to the server in this container (step 4) — that is what a self-contained
 # deployment needs, and what the image is built for. Moving it out is one secret: with

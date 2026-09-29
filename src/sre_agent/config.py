@@ -123,12 +123,20 @@ class Settings(BaseSettings):
     require_approval_for_deploy: bool = False
 
     # ── Sandbox ─────────────────────────────────────────────
-    sandbox_backend: str = "auto"  # auto | docker | local
-    sandbox_image: str = "python:3.12-slim"
+    # auto | docker | local. `auto` prefers container isolation and names the reason when it
+    # cannot have it, rather than quietly running generated code in-process.
+    sandbox_backend: str = "auto"
+    # The image the container runs in, built from docker/sandbox.Dockerfile. It has to exist on
+    # whichever daemon DOCKER_HOST points at, so a remote daemon needs it built there too.
+    sandbox_image: str = "sre-memory-agent/sandbox:pytest"
     sandbox_timeout_seconds: int = 300
     sandbox_network: str = "none"
     sandbox_memory_limit: str = "1g"
     sandbox_cpus: int = 2
+    # Stream the workspace into the container instead of bind-mounting it. Needed whenever the
+    # daemon cannot see this filesystem (a remote DOCKER_HOST), and the safer default
+    # everywhere: the container shares no directory with the host, so nothing it writes can
+    # leak back into the workspace under test. A remote daemon forces this on.
     sandbox_copy_repo: bool = True
 
     # ── Target repository under repair ──────────────────────

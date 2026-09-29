@@ -86,9 +86,16 @@ presented as live when it is not.
   takes a few minutes; every start after that reuses `/data`. If the memory server is still
   starting when the API comes up, the agent connects on a later check instead of needing a
   restart.
-- **Sandbox** — a Space has no Docker daemon, so generated code runs in the local
-  temporary-workspace backend instead of a container. The dashboard reports this as a
-  degradation. A container-isolated sandbox needs the self-hosted setup in the repository.
+- **Sandbox** — a Space cannot run a Docker daemon (that needs privileged mode or the host
+  socket), so container isolation comes from a daemon *elsewhere*: set `DOCKER_HOST` —
+  `ssh://user@your-host` with `DOCKER_SSH_KEY`, or `tcp://your-host:2376` with
+  `DOCKER_CA_CERT` / `DOCKER_CLIENT_CERT` / `DOCKER_CLIENT_KEY` — and build
+  `sre-memory-agent/sandbox:pytest` on that daemon first
+  (`docker build -f docker/sandbox.Dockerfile -t sre-memory-agent/sandbox:pytest docker/`).
+  The workspace is streamed into the container because that daemon cannot see this
+  filesystem. With no daemon, generated code runs in the local temporary-workspace backend
+  and the dashboard reports the missing isolation as a degradation rather than calling it
+  isolation.
 
 Incident history, the recording and model caches, and the memory database are all written
 under `/data`, which a Space preserves across restarts.

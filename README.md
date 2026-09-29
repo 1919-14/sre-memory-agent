@@ -212,10 +212,22 @@ embedded PostgreSQL, its database and embedding-model cache under `/data` so mem
 a restart. It requires `GROQ_API_KEY`, since Hindsight extracts memories with an LLM (the
 image sizes are the cost — that package bundles PostgreSQL and the embedding models).
 
-**The sandbox is the one honest exception.** A Space has no Docker daemon, so generated code
-runs in the local temporary-workspace backend and the dashboard reports the missing container
-isolation as a degradation. And without `GROQ_API_KEY` the demo falls back to re-rendering
-recorded trajectories, which the UI marks `simulated`.
+**The sandbox needs a daemon somewhere, and a Space cannot host one.** Docker-in-Spaces needs
+privileged mode or the host socket, and Spaces provide neither, so container isolation comes
+from a daemon *elsewhere*: set `DOCKER_HOST` (a Space variable or secret) to reach one over
+`ssh://` or TLS, and the sandbox runs generated code in the `sre-memory-agent/sandbox:pytest`
+container on that daemon. Build the image there once —
+`docker build -f docker/sandbox.Dockerfile -t sre-memory-agent/sandbox:pytest docker/`.
+
+Because that daemon cannot see the Space's filesystem, the workspace is **streamed** into the
+container and extracted into an ephemeral `tmpfs` mount rather than bind-mounted: a bind mount
+against a remote daemon resolves to a path that does not exist over there, so the container
+would test an empty directory and report failures that say nothing about the code. With no
+`DOCKER_HOST`, the agent falls back to the local temporary-workspace backend and the dashboard
+reports the missing container isolation as a degradation — it never calls that isolation.
+
+Without `GROQ_API_KEY` the demo falls back to re-rendering recorded trajectories, which the UI
+marks `simulated`.
 
 ---
 
@@ -337,11 +349,15 @@ and refuses to invent one. Runs are labelled `simulated`/`REPLAY` when replayed.
 The agent never executes arbitrary shell against production.
 
 * Generated code runs **only** in a sandbox: a container with no network, memory/CPU/PID
-  caps and a non-root user (`docker/sandbox.Dockerfile`), or — when Docker or that image is
-  unavailable — a temp workspace on the host. Which one is in force is always reported:
-  the dashboard shows `Isolated` or `Local fallback`, and the latter degrades the overall
-  agent status, because container isolation is part of what this agent guarantees about
-  code it wrote itself.
+  caps and a non-root user (`docker/sandbox.Dockerfile`), or — when no Docker daemon answers
+  or that image is missing — a temp workspace on the host. The container may run on any
+  daemon `DOCKER_HOST` names, local or remote (`SANDBOX_COPY_REPO`, on by default, streams
+  the workspace in for daemons that cannot see this filesystem; a remote daemon forces it).
+  Which one is in force is always reported: the dashboard shows `Isolated` or `Local
+  fallback`, and the latter degrades the overall agent status, because container isolation is
+  part of what this agent guarantees about code it wrote itself. The image is also checked
+  for the ability to run pytest, so a tag that exists but cannot run this project's suites is
+  reported as a misconfiguration instead of surfacing as broken code.
 * Patches are validated deterministically before execution: path allowlist and denylist,
   traversal rejection, size caps, secret detection.
 * A review gate blocks execution on critical findings — hardcoded credentials, shell
