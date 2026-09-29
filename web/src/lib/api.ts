@@ -345,6 +345,8 @@ export interface SystemStatus {
   hindsight_ready: boolean
   hindsight_detail: string
   sandbox_backend: string
+  /** Why that backend is the one in force — the missing guarantee, in words. */
+  sandbox_detail: string
   docker_available: boolean
   run_mode: string
   repo_present: boolean

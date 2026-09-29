@@ -14,6 +14,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, type IncidentSummary } from '../lib/api'
 import { errorClassNote, percent, relativeTime, titleize } from '../lib/format'
 import { useApi } from '../lib/hooks'
+import { degradationReason } from '../lib/status'
 import { useRefreshAfter, useSystem } from '../lib/system'
 import { Page } from '../components/AppShell'
 import { ActivityStream } from '../components/ActivityStream'
@@ -40,10 +41,9 @@ function systemRows(status: ReturnType<typeof useSystem>['status']) {
       variant: (status.healthy ? 'ok' : 'warn') as Variant,
       value: status.healthy ? 'Operational' : 'Degraded',
       // When degraded, say why. Reporting "Idle, ready for work" next to a DEGRADED badge
-      // contradicts itself and tells the operator nothing.
-      note: status.running
-        ? 'An incident is running now'
-        : (status.warnings[0] ?? 'Idle, ready for work'),
+      // contradicts itself and tells the operator nothing — and when the only limitation is
+      // the sandbox, the reason is in `sandbox_detail` rather than in the warnings.
+      note: status.running ? 'An incident is running now' : degradationReason(status),
     },
     {
       label: 'Hindsight memory',
@@ -63,10 +63,10 @@ function systemRows(status: ReturnType<typeof useSystem>['status']) {
       label: 'Sandbox',
       variant: (status.sandbox_backend === 'docker' ? 'ok' : 'warn') as Variant,
       value: status.sandbox_backend === 'docker' ? 'Isolated' : 'Local fallback',
+      // The API reports the real reason, so this card never guesses at one the agent can name.
       note:
-        status.sandbox_backend === 'docker'
-          ? 'Generated code runs in a container with no network and resource caps'
-          : 'Docker is unavailable or its sandbox image is missing, so generated code runs in a temporary workspace instead of a container',
+        status.sandbox_detail ||
+        'Generated code runs in a temporary workspace instead of a container',
     },
     {
       label: 'Repository',
@@ -219,8 +219,9 @@ export default function Overview() {
             </div>
           ) : null}
 
-          {/* Healthy facts, deliberately not styled as a problem. */}
-          {status && status.warnings.length === 0 && status.notes.length > 0 ? (
+          {/* Healthy facts, deliberately not styled as a problem — and still shown while
+              something else is degraded, because the dependencies are independent. */}
+          {status && status.notes.length > 0 ? (
             <Panel className="mt-5">
               <ul className="divide-y divide-hair">
                 {status.notes.map((note) => (

@@ -50,6 +50,10 @@ class SandboxError(RuntimeError):
 class TestBackend(ABC):
     name: str = "base"
     isolated: bool = False
+    # Set by `select_backend`: why this backend was selected. Empty means "not explained yet",
+    # never "nothing to explain" — the API reports it as `sandbox_detail`, so the dashboard can
+    # say which guarantee is missing instead of only that one is.
+    reason: str = ""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or default_settings

@@ -227,6 +227,7 @@ class AgentService:
             hindsight_ready=reachable,
             hindsight_detail=detail,
             sandbox_backend=sandbox.backend.name,
+            sandbox_detail=sandbox.backend.reason,
             docker_available=docker_ok,
             run_mode=RunMode.REPLAY if self.settings.demo_replay_mode else RunMode.LIVE,
             repo_present=repo_present,

@@ -455,6 +455,11 @@ class AgentStatus(BaseModel):
     hindsight_ready: bool = False
     hindsight_detail: str = ""
     sandbox_backend: str = "local"
+    # Why that backend is the one in force. A local backend is a real degradation — container
+    # isolation is part of what this agent promises about code it wrote itself — and a badge
+    # that says "degraded" without saying which guarantee is missing is indistinguishable from
+    # a broken agent. `SandboxBackend.reason` already knows; this surfaces it.
+    sandbox_detail: str = ""
     docker_available: bool = False
     run_mode: RunMode = RunMode.LIVE
     repo_present: bool = False

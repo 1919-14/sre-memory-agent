@@ -20,6 +20,7 @@ import pytest
 from sre_agent.config import Settings
 from sre_agent.sandbox import backends
 from sre_agent.sandbox.backends import DockerBackend, _workspace_archive
+from sre_agent.sandbox.executor import SandboxExecutor
 
 
 def _backend(monkeypatch: pytest.MonkeyPatch, **env: str) -> DockerBackend:
@@ -142,7 +143,8 @@ def _workspace(tmp_path: Path) -> Path:
     (workspace / "__pycache__").mkdir()
     (workspace / ".git").mkdir()
     (workspace / "src" / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
-    (workspace / "tests" / "test_app.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    test_file = workspace / "tests" / "test_app.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
     (workspace / "__pycache__" / "app.cpython-312.pyc").write_bytes(b"\x00cached")
     (workspace / ".git" / "config").write_text("[core]\n", encoding="utf-8")
     return workspace
@@ -247,6 +249,50 @@ def test_local_backend_is_still_available_without_docker(monkeypatch: pytest.Mon
     assert backend.name == "local"
     assert any("Docker sandbox unavailable" in warning for warning in warnings)
     assert "docker executable not found" in warnings[0]
+
+
+def test_a_local_fallback_explains_itself(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`sandbox_detail` is what turns a DEGRADED badge into an explained one."""
+    monkeypatch.setattr(backends.shutil, "which", lambda _name: None)
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
+
+    backend, _ = backends.select_backend(Settings(sandbox_backend="auto"))
+
+    assert backend.name == "local"
+    assert "no Docker daemon answered" in backend.reason
+    assert "temporary workspace" in backend.reason
+
+
+def test_configured_local_backend_is_reported_as_a_choice(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Switched off deliberately is still a missing guarantee, so it is never silent."""
+    backend, warnings = backends.select_backend(Settings(sandbox_backend="local"))
+
+    assert "switched off in configuration" in backend.reason
+    assert any("SANDBOX_BACKEND=local" in warning for warning in warnings)
+
+
+def test_docker_backend_reason_describes_the_daemon_it_will_use(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    detail = "Docker 27.3.1 at ssh://user@builder; image sandbox:pytest; workspace copy"
+    monkeypatch.setattr(DockerBackend, "available", lambda _self: (True, detail))
+
+    backend, warnings = backends.select_backend(Settings(sandbox_backend="auto"))
+
+    assert backend.name == "docker"
+    assert backend.reason == detail
+    assert warnings == []
+
+
+def test_executor_carries_the_reason_the_api_reports(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The chain the dashboard depends on: select_backend -> executor -> /api/status."""
+    monkeypatch.setattr(backends.shutil, "which", lambda _name: None)
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
+
+    executor = SandboxExecutor(Settings(sandbox_backend="auto"))
+
+    assert executor.backend.name == "local"
+    assert executor.backend.reason, "an unexplained degradation is what made the badge read as broken"
 
 
 def test_binary_probe_does_not_depend_on_the_host_os() -> None:

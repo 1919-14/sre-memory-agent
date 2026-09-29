@@ -391,19 +391,34 @@ def select_backend(settings, *, python: str | None = None) -> tuple[TestBackend,
     if preference == "docker":
         ok, detail = docker.available()
         if ok:
+            docker.reason = detail
             return docker, warnings
         warnings.append(f"SANDBOX_BACKEND=docker is not usable ({detail}); using the local backend.")
+        local.reason = f"container isolation was requested but is not usable: {detail}"
         return local, warnings
 
     if preference == "local":
+        # Chosen, not fallen back to — and still reported. An agent running generated code
+        # outside a container is degraded whoever decided that, and the reason has to reach
+        # the dashboard or the badge is an unexplained warning sign.
+        local.reason = "SANDBOX_BACKEND=local: container isolation is switched off in configuration"
+        warnings.append(
+            "SANDBOX_BACKEND=local is set, so generated code runs in a temporary workspace "
+            "instead of a container."
+        )
         return local, warnings
 
     # auto
     ok, detail = docker.available()
     if ok:
+        docker.reason = detail
         return docker, warnings
     local_ok, local_detail = local.available()
     if not local_ok:
         warnings.append(f"Local sandbox unavailable: {local_detail}")
     warnings.append(f"Docker sandbox unavailable ({detail}); running with local isolation.")
+    local.reason = (
+        f"no Docker daemon answered ({detail}), so generated code runs in a temporary "
+        "workspace instead of a container"
+    )
     return local, warnings

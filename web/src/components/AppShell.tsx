@@ -18,6 +18,7 @@ import { useState, type ReactNode } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 
 import { api, type SystemStatus } from '../lib/api'
+import { degradationLabel } from '../lib/status'
 import { useRefreshAfter, useSystem } from '../lib/system'
 import { Btn, StatusMark, type Variant } from './primitives'
 
@@ -83,10 +84,14 @@ function statusCells(status: SystemStatus | null): { label: string; value: strin
       { label: 'Sandbox', value: 'Connecting', variant: 'info' },
     ]
   }
+  // `Degraded` alone reads as a failure. It is a partial capability, so say which one is
+  // missing: on a hosted Space this is usually the sandbox, which is a known and expected
+  // limit rather than something broken.
+  const limited = status.healthy ? '' : degradationLabel(status)
   return [
     {
       label: 'Agent',
-      value: status.healthy ? 'Operational' : 'Degraded',
+      value: limited ? `Degraded · ${limited}` : 'Operational',
       variant: status.healthy ? 'ok' : 'warn',
     },
     {
