@@ -21,7 +21,6 @@ import { Panel } from '../components/primitives'
 import {
   APP_PATH,
   DOCS_URL,
-  EVENT,
   EYEBROW,
   FAILURE_FLOW,
   HERO_STAGES,
@@ -673,10 +672,12 @@ function LandingFooter() {
           </nav>
 
           <div className="lg:col-span-3">
-            <h2 className="text-label font-black uppercase tracking-widest text-paper/70">Built for</h2>
-            <p className="mt-4 text-meta font-bold uppercase tracking-wide text-paper">{EVENT}</p>
+            <h2 className="text-label font-black uppercase tracking-widest text-paper/70">Built with</h2>
+            <p className="mt-4 text-meta font-bold uppercase tracking-wide text-paper">
+              Hindsight agent memory
+            </p>
             <p className="mt-4 text-micro text-paper/70">
-              Hindsight memory · sandboxed repairs · regression verification
+              Sandboxed repairs · regression verification · auditable rollback
             </p>
           </div>
         </div>

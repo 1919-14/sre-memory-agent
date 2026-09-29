@@ -38,8 +38,6 @@ export const REPO_URL: string | null =
 /** The project's own documentation is its README, so that is what "Documentation" means. */
 export const DOCS_URL = REPO_URL ? `${REPO_URL}#readme` : null
 
-export const EVENT = 'HackWithHyderabad 3.0'
-
 // ── navigation ────────────────────────────────────────────────
 
 export const NAV_SECTIONS = [

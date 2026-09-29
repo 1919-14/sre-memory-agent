@@ -138,4 +138,4 @@ cd web && npm ci && npm run build && cd ..
 SPACE=vssksn/sre-memory-agent HF_TOKEN=hf_xxx bash deploy/huggingface/sync.sh
 ```
 
-Built for **HackWithHyderabad 3.0**.
+Built with **Hindsight** agent memory.
