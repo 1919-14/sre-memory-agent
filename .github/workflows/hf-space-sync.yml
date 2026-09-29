@@ -1,0 +1,73 @@
+name: Sync to Hugging Face Space
+
+# Publishes this repository to the Docker Space configured in `vars.HF_SPACE` (or the
+# default below). The Space is a mirror of `main`: it is never edited in place, so a
+# redeploy is always a force-push of a fresh snapshot built by deploy/huggingface/sync.sh.
+#
+# Required configuration (once):
+#   secret   HF_TOKEN   a *write* token from https://huggingface.co/settings/tokens
+#   variable HF_SPACE   owner/name of the Space, e.g. vssksn/sre-memory-agent
+#
+# The build artefact (web/dist) is gitignored and produced here on the runner, because a
+# Space needs the dashboard present at build time and the image has no Node toolchain.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      space:
+        description: "Target Space as owner/name (defaults to the HF_SPACE variable)"
+        required: false
+        type: string
+
+# Two deploys racing for the same Space would interleave force-pushes, and cancelling one
+# mid-push can leave the Space serving a half-published commit.
+concurrency:
+  group: hf-space-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEFAULT_HF_SPACE: vssksn/sre-memory-agent
+
+jobs:
+  publish:
+    name: Publish to Hugging Face Space
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build the dashboard
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Publish the snapshot to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN || secrets.TOKEN }}
+          SPACE: ${{ inputs.space || vars.HF_SPACE || env.DEFAULT_HF_SPACE }}
+        run: |
+          bash deploy/huggingface/sync.sh
+          {
+            echo "### Space redeployed"
+            echo
+            echo "- Space: [\`$SPACE\`](https://huggingface.co/spaces/$SPACE)"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo
+            echo "The Space rebuilds the image from this commit and then runs"
+            echo "\`entrypoint.sh\`, which logs \`[entrypoint] starting API\` when it is serving."
+          } >> "$GITHUB_STEP_SUMMARY"

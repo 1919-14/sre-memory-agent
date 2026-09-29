@@ -119,6 +119,7 @@ config/          standing repository conventions seeded into convention memory
 scripts/         setup, serve, run, verify, seed, Hindsight launcher
 tests/           67 tests covering parsing, safety, memory schema and the full loop
 web/             React + TypeScript dashboard (built to web/dist, served by FastAPI)
+deploy/          deployment targets; currently the Hugging Face Spaces runtime + publisher
 ```
 
 ---
@@ -181,6 +182,36 @@ venv/Scripts/python.exe scripts/run_incident.py --scenario concurrency
 # verify the Hindsight integration on its own
 venv/Scripts/python.exe scripts/verify_memory.py
 ```
+
+### Deploying to Hugging Face Spaces
+
+The public Space (`vssksn/sre-memory-agent`) is a mirror of `main`, published by
+`.github/workflows/hf-space-sync.yml`. The workflow builds the dashboard on the runner and
+forces a single clean commit onto the Space — the repository history and any generated state
+are never published.
+
+| What | Where |
+| --- | --- |
+| Space runtime image | `deploy/huggingface/Dockerfile` |
+| Container entrypoint (env defaults, `/data` storage, demo repo) | `deploy/huggingface/entrypoint.sh` |
+| Space card and deployment guide | `deploy/huggingface/README.md` |
+| Snapshot publisher | `deploy/huggingface/sync.sh` |
+
+Configure the workflow once: add a **write** token as the `HF_TOKEN` secret, and optionally a
+`HF_SPACE` repository variable to override the target Space. To publish from a local checkout
+instead:
+
+```bash
+cd web && npm ci && npm run build && cd ..
+SPACE=vssksn/sre-memory-agent HF_TOKEN=hf_xxx bash deploy/huggingface/sync.sh
+```
+
+**The Space is configured to stay honest about what it cannot do.** A Space has no Docker
+daemon, so `entrypoint.sh` selects the local sandbox backend and the dashboard reports the
+missing container isolation as a degradation. Hindsight is external, so without
+`HINDSIGHT_API_KEY` memory is reported unavailable rather than faked. And without
+`GROQ_API_KEY` the demo falls back to re-rendering recorded trajectories, which the UI marks
+`simulated`. Add those keys as Space secrets to run the agent live.
 
 ---
 
