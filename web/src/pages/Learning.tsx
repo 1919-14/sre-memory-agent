@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { api, type IncidentSummary } from '../lib/api'
 import { percent, relativeTime, titleize } from '../lib/format'
 import { useApi } from '../lib/hooks'
+import { appPath } from '../lib/site'
 import { useSystem } from '../lib/system'
 import { Page } from '../components/AppShell'
 import {
@@ -134,7 +135,7 @@ export default function Learning() {
                     <li key={incident.id} className="flex w-16 shrink-0 flex-col items-center gap-2">
                       <span className="font-mono text-micro tabular text-status-idle">{attempts}</span>
                       <Link
-                        to={`/incidents/${incident.id}`}
+                        to={appPath(`/incidents/${incident.id}`)}
                         title={`${incident.id} — ${titleize(incident.error_class)} — ${incident.outcome ?? 'incomplete'}`}
                         className={`w-full border-2 border-ink transition-colors duration-150 ease-linear hover:border-accent ${
                           recovered ? 'bg-ink hover:bg-accent' : 'bg-accent hover:bg-ink'
@@ -206,7 +207,7 @@ export default function Learning() {
                 {(rollbacks.length > 0 ? rollbacks.slice(-4) : []).map((incident) => (
                   <li key={incident.id} className="flex items-center justify-between gap-3">
                     <Link
-                      to={`/incidents/${incident.id}`}
+                      to={appPath(`/incidents/${incident.id}`)}
                       className="font-mono text-micro underline-offset-4 hover:text-accent hover:underline"
                     >
                       {incident.id}

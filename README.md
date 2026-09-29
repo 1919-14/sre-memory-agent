@@ -118,7 +118,8 @@ demo/            the deliberately-broken service the agent repairs (tracked temp
 config/          standing repository conventions seeded into convention memory
 scripts/         setup, serve, run, verify, seed, Hindsight launcher
 tests/           67 tests covering parsing, safety, memory schema and the full loop
-web/             React + TypeScript dashboard (built to web/dist, served by FastAPI)
+web/             React + TypeScript landing page at / and dashboard at /app (built to
+                 web/dist, served by FastAPI)
 deploy/          deployment targets; currently the Hugging Face Spaces runtime + publisher
 ```
 
@@ -231,6 +232,124 @@ marks `simulated`.
 
 ---
 
+## The landing page
+
+The public page is served at `/`. It explains the mechanism — the problem, the ten-step loop,
+what memory changes, what happens when a repair fails, the architecture and the safety
+principles — and then hands the visitor to the application.
+
+It is **not** a second dashboard and it carries no sample data. The panels that look like
+screenshots are the product: the capability strip, the instance counters, the memory records,
+the latest incident's diff and its test reports are all rendered from the running deployment
+through the same API and, where it applies, the same components the dashboard uses. Where
+there is nothing to show — an empty bank, no incidents yet, an unreachable API — the page says
+so rather than inventing a figure. The page renders without the API at all, so an unreachable
+backend never blocks the front door.
+
+It also carries a slideshow of six real captures of the dashboard, labelled by route — see
+[Screenshots](#screenshots).
+
+```
+/                    the public landing page
+/app                 the dashboard (Overview)
+/app/incidents       history and scenarios
+/app/incidents/:id   one investigation, as a numbered timeline
+/app/memory          both Hindsight banks, search, conventions, runbook
+/app/repairs         patches, diffs, review and regression outcomes
+/app/review          the review gate's findings
+/app/sandbox         reproduce-before-patch evidence
+/app/learning        attempts per incident over time
+/app/system          dependencies, degradation modes, raw event stream
+/app/settings        the configuration the backend is running with
+```
+
+The routes the dashboard answered before it moved (`/incidents`, `/incidents/:id`,
+`/memory`, …) redirect to their `/app` equivalents, so an incident link shared last week still
+opens the same incident. `/landing` also redirects to `/`.
+
+The copy lives in `web/src/lib/site.ts`, including the repository link every "View GitHub"
+affordance reads — set `VITE_GITHUB_URL` to override it, or to an empty string to hide every
+source link rather than point at a repository that does not exist.
+
+## Screenshots
+
+Nothing below is a mock-up. Each image is a capture of the running dashboard, labelled with the
+route it was taken from; the figures in them belong to the run that produced them, which is why
+they are labelled rather than presented as live. The landing page shows the same six as a
+slideshow.
+
+### `/app` — Overview
+
+![The dashboard overview: a status strip for the agent, memory, LLM and sandbox, a system status panel, recorded performance metrics and the live activity stream](web/public/screenshots/overview.webp)
+
+*Dependency health, the recorded performance figures, the latest incident and the live activity
+stream. Every figure is computed from stored incidents — there are no estimates anywhere.*
+
+### `/app` — system status
+
+![The system status panel: a card per dependency with a status word and the sentence explaining it](web/public/screenshots/overview-system-status.webp)
+
+*Hindsight memory, the LLM provider, the sandbox and the repository, each with the reason it is
+limited when it is. A sandbox running outside a container is reported as a missing guarantee,
+not folded into one unexplained “degraded”.*
+
+### `/app/incidents` — history and scenarios
+
+![The incidents screen: scenario cards for the demonstration failures above a sortable table of past incidents](web/public/screenshots/incidents.webp)
+
+*The three demonstration scenarios, the recorded trajectories available for replay, and the full
+history with search, outcome filter and sort.*
+
+### `/app/incidents/:id` — one investigation
+
+![An incident investigation page: numbered timeline stages from detection to learning, each with its status and a summary line, above the recorded evidence](web/public/screenshots/incident.webp)
+
+*One incident as a numbered timeline — detected, classified, remembered, compared, repaired,
+reviewed, sandboxed, regression-checked, recovered, learned — with the real evidence behind each
+step. This is the screen that makes the design legible: a failed attempt stays in the timeline.*
+
+### `/app/memory` — what the agent remembers
+
+![The memory screen: the incident and convention banks, a search field, and the service runbook](web/public/screenshots/memory.webp)
+
+*Both Hindsight banks, tag-scoped search, the conventions the review gate enforces, and the
+runbook the agent maintains for itself.*
+
+### `/app/learning` — whether effort is falling
+
+![The learning screen: attempts per incident drawn as labelled columns, with totals for memories recalled, fixes reused and approaches avoided](web/public/screenshots/learning.webp)
+
+*Attempts per incident over time, recall versus reuse, and whether the effort each incident costs
+is falling as memory fills. A falling attempts line with a rising reuse count is the whole thesis
+of the project in one screen.*
+
+**Where the files live, and how a Space gets them.** The optimised files are committed under
+`web/public/screenshots/` — six WebP images, about 285 KB in total, from 3.2 MB of raw PNG. A
+Hugging Face Space does not carry binaries, so `deploy/huggingface/sync.sh` strips them from the
+published snapshot and the workflow builds the dashboard with `VITE_SCREENSHOT_BASE` pointing at
+this repository, which is where the Space then loads them from (the repository has to be public
+for an anonymous `raw.githubusercontent.com` read). Set `PUBLISH_SCREENSHOTS=1` to publish them
+with the Space instead. The landing page reads its own `/screenshots` directory
+first, falls back to the repository, and drops a slide it cannot load rather than showing a
+broken image.
+
+**Re-capturing them**, with the API running (`python scripts/serve.py`):
+
+```bash
+# 1. capture (Chrome is driven over the DevTools Protocol; no extra dependency is installed)
+cd web && node scripts/capture-screenshots.mjs --out ../screenshots --width 1917 --height 907
+
+# 2. optimise to WebP and the published names
+cd .. && venv/Scripts/python.exe scripts/optimize_screenshots.py screenshots web/public/screenshots
+```
+
+The capture script writes one file per view and refuses to report success on a page that rendered
+nothing; `--views repairs,sandbox` re-shoots a subset. The optimiser derives each output name from
+the capture's file name, and takes `--rename FROM=TO` for files that arrive with another name —
+as the first four did, having come from a browser download as `image.png`, `image copy.png`, and so
+on. A capture of a page whose selected incident has repairs is one `--views` flag away; the
+`repairs`, `review`, `sandbox`, `system` and `settings` screens are all in the script's view list.
+
 ## The dashboard
 
 A React + TypeScript interface, built to `web/dist` and served by FastAPI at the same origin,
@@ -284,7 +403,9 @@ every component, so the primitives are written directly against the design token
 **Nothing is fabricated.** There are no placeholder pages and no invented numbers. Where the API
 cannot supply a figure the interface says so; where a run was degraded or replayed, the page says
 that too. Per-incident recall counts are shown on the incident page rather than in the list,
-because the list API does not carry them.
+because the list API does not carry them. The landing page follows the same rule in the places
+where a screenshot would be easier: it renders the real memory records, the real patch diff and
+the real test reports, and states plainly when a deployment has none yet.
 
 ---
 
@@ -398,9 +519,10 @@ memory layer (banks, policy, tags, retain, recall, reflect, runbook mental model
 convention memory, trajectory record/replay, seeding, SQLite persistence, the FastAPI
 service with SSE, and the CLI tools.
 
-**The dashboard is built** (`web/`) and served by FastAPI at `/`. It reads live API data
-everywhere — no mock JSON, no fake metrics — and the production build passes
-(`npm run build`), with per-page code splitting so the first paint carries only the shell.
+**The public page and the dashboard are built** (`web/`): the landing page at `/`, the
+dashboard under `/app`. Both read live API data everywhere — no mock JSON, no fake metrics —
+and the production build passes (`npm run build`), with per-page code splitting so the first
+paint carries only the shell.
 
 **Verified against a real Hindsight server** (Docker, `ghcr.io/vectorize-io/hindsight`):
 bank creation, Memory Defense (`action=redact`, confirmed by reading the bank config back),

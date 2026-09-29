@@ -15,9 +15,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 import { api, type SystemStatus } from '../lib/api'
+import { APP_PATH, appPath } from '../lib/site'
 import { degradationLabel } from '../lib/status'
 import { useRefreshAfter, useSystem } from '../lib/system'
 import { Btn, StatusMark, type Variant } from './primitives'
@@ -29,16 +30,18 @@ interface NavItem {
   group: 'operations' | 'system'
 }
 
+// The dashboard lives under `/app`; the addresses inside it are absolute so a shared link is
+// readable and stays valid.
 const NAV: NavItem[] = [
-  { to: '/', label: 'Overview', icon: LayoutDashboard, group: 'operations' },
-  { to: '/incidents', label: 'Incidents', icon: TriangleAlert, group: 'operations' },
-  { to: '/memory', label: 'Memory', icon: BrainCircuit, group: 'operations' },
-  { to: '/repairs', label: 'Repairs', icon: Wrench, group: 'operations' },
-  { to: '/review', label: 'Review', icon: ShieldCheck, group: 'operations' },
-  { to: '/sandbox', label: 'Sandbox', icon: Box, group: 'operations' },
-  { to: '/learning', label: 'Learning', icon: TrendingUp, group: 'operations' },
-  { to: '/system', label: 'System', icon: Activity, group: 'system' },
-  { to: '/settings', label: 'Settings', icon: Settings, group: 'system' },
+  { to: appPath(), label: 'Overview', icon: LayoutDashboard, group: 'operations' },
+  { to: appPath('/incidents'), label: 'Incidents', icon: TriangleAlert, group: 'operations' },
+  { to: appPath('/memory'), label: 'Memory', icon: BrainCircuit, group: 'operations' },
+  { to: appPath('/repairs'), label: 'Repairs', icon: Wrench, group: 'operations' },
+  { to: appPath('/review'), label: 'Review', icon: ShieldCheck, group: 'operations' },
+  { to: appPath('/sandbox'), label: 'Sandbox', icon: Box, group: 'operations' },
+  { to: appPath('/learning'), label: 'Learning', icon: TrendingUp, group: 'operations' },
+  { to: appPath('/system'), label: 'System', icon: Activity, group: 'system' },
+  { to: appPath('/settings'), label: 'Settings', icon: Settings, group: 'system' },
 ]
 
 function SidebarLink({ item }: { item: NavItem }) {
@@ -46,7 +49,7 @@ function SidebarLink({ item }: { item: NavItem }) {
   return (
     <NavLink
       to={item.to}
-      end={item.to === '/'}
+      end={item.to === APP_PATH}
       className={({ isActive }) =>
         `nav-link ${isActive ? 'bg-ink text-paper hover:bg-ink' : 'text-ink'}`
       }
@@ -130,14 +133,14 @@ export function AppShell({ children }: { children: ReactNode }) {
    */
   const runDemo = async () => {
     if (running && activeRunId) {
-      navigate(`/incidents/${activeRunId}`)
+      navigate(appPath(`/incidents/${activeRunId}`))
       return
     }
     setStarting(true)
     try {
       const result = await api.startIncident({ scenario: 'concurrency' })
       refresh()
-      navigate(`/incidents/${result.incident.id}`)
+      navigate(appPath(`/incidents/${result.incident.id}`))
     } catch {
       // The dashboard surfaces backend errors; a failed start needs no extra banner here.
     } finally {
@@ -287,7 +290,7 @@ function NavGroup({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => 
 function Wordmark() {
   return (
     <div className="px-4 py-5">
-      <div className="flex items-center gap-2">
+      <Link to={appPath()} className="flex items-center gap-2">
         <span aria-hidden className="grid h-7 w-7 place-items-center bg-ink text-paper">
           <span className="h-3 w-3 bg-accent" />
         </span>
@@ -296,7 +299,7 @@ function Wordmark() {
           <br />
           Agent
         </span>
-      </div>
+      </Link>
       <p className="mt-3 text-micro leading-snug text-status-idle">
         Incident recovery that remembers.
       </p>

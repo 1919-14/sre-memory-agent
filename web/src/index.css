@@ -183,6 +183,35 @@
   .code-surface {
     @apply overflow-auto bg-ink text-paper font-mono text-micro leading-relaxed;
   }
+
+  /* ── landing page: section entrance ──────────────────────── */
+
+  /*
+   * Entrance motion for the public page. Deliberately a transition rather than an animation:
+   * the element is always in the DOM and readable, so a failed observer (or scripting off)
+   * leaves the page legible instead of blank, and `prefers-reduced-motion` resolves it to the
+   * final state below rather than mid-transition.
+   */
+  .reveal {
+    opacity: 0;
+    transform: translateY(10px);
+    transition:
+      opacity 320ms cubic-bezier(0.2, 0, 0, 1),
+      transform 320ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .reveal[data-visible='true'] {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal,
+    .reveal[data-visible='false'] {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 
 @layer utilities {

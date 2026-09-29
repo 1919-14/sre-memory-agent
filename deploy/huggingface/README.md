@@ -96,6 +96,14 @@ presented as live when it is not.
   filesystem. With no daemon, generated code runs in the local temporary-workspace backend
   and the dashboard reports the missing isolation as a degradation rather than calling it
   isolation.
+- **The dashboard screenshots are read from GitHub, not from this Space.** They are the only
+  binaries in the project, so `sync.sh` leaves them out of the Space snapshot and the workflow
+  builds the page with `VITE_SCREENSHOT_BASE` pointed at the source repository; the landing page
+  then loads them from `raw.githubusercontent.com`. They are captures of a real run and are
+  labelled by route both on the page and in the repository README. If the repository is not
+  publicly readable, the landing page says the screenshots are unavailable instead of showing
+  six broken images. Set `PUBLISH_SCREENSHOTS=1` when running `sync.sh` to publish them with the
+  Space instead.
 
 Incident history, the recording and model caches, and the memory database are all written
 under `/data`, which a Space preserves across restarts.

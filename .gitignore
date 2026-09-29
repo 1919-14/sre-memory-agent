@@ -58,6 +58,12 @@ node_modules/
 Thumbs.db
 desktop.ini
 
+# ── Screenshots ─────────────────────────────────────────────
+# Raw captures (megabytes of PNG) are working input. The published images are the optimised
+# WebP files under web/public/screenshots, and those are committed — see the README.
+/screenshots/
+web/.screenshots-raw/
+
 # ── frontend ───────────────────────────────────────────────
 # node_modules is reproducible from package.json; dist is a build artefact that
 # FastAPI serves when present, so it is rebuilt rather than committed.

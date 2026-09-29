@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, type IncidentSummary } from '../lib/api'
 import { localDateTime, relativeTime, titleize } from '../lib/format'
 import { useApi } from '../lib/hooks'
+import { appPath } from '../lib/site'
 import { useRefreshAfter, useSystem } from '../lib/system'
 import { Page } from '../components/AppShell'
 import { IncidentTable } from '../components/IncidentTable'
@@ -28,7 +29,7 @@ export default function Incidents() {
       const result = await api.startIncident({ scenario })
       incidents.reload()
       refresh()
-      navigate(`/incidents/${result.incident.id}`)
+      navigate(appPath(`/incidents/${result.incident.id}`))
     } finally {
       setStarting(null)
     }

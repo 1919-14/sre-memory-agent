@@ -52,6 +52,12 @@ jobs:
 
       - name: Build the dashboard
         working-directory: web
+        env:
+          # The Space does not carry the screenshot binaries — sync.sh strips them from the
+          # snapshot — so the built page reads them from this repository instead. Without this
+          # the landing page would request /screenshots/*, miss, and fall back to the same URL
+          # on every slide.
+          VITE_SCREENSHOT_BASE: https://raw.githubusercontent.com/${{ github.repository }}/main/web/public/screenshots
         run: |
           npm ci --no-audit --no-fund
           npm run build

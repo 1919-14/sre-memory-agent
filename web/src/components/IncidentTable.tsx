@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 
 import type { IncidentSummary } from '../lib/api'
 import { errorClassNote, outcomeLabel, outcomeVariant, relativeTime, titleize } from '../lib/format'
+import { appPath } from '../lib/site'
 import { Empty, StatusMark, Tag } from './primitives'
 
 type SortKey = 'created_at' | 'attempts' | 'error_class'
@@ -145,7 +146,7 @@ export function IncidentTable({
                 <tr key={incident.id} className="group border-b border-hair hover:bg-muted">
                   <td className="px-4 py-3">
                     <Link
-                      to={`/incidents/${incident.id}`}
+                      to={appPath(`/incidents/${incident.id}`)}
                       className="block font-mono text-micro font-bold text-ink underline-offset-4 hover:text-accent hover:underline"
                     >
                       {incident.id}

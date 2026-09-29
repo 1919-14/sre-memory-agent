@@ -14,6 +14,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, type IncidentSummary } from '../lib/api'
 import { errorClassNote, percent, relativeTime, titleize } from '../lib/format'
 import { useApi } from '../lib/hooks'
+import { appPath } from '../lib/site'
 import { degradationReason } from '../lib/status'
 import { useRefreshAfter, useSystem } from '../lib/system'
 import { Page } from '../components/AppShell'
@@ -127,7 +128,7 @@ function HeroIncident({ incident }: { incident: IncidentSummary }) {
             </div>
           </div>
           <Link
-            to={`/incidents/${incident.id}`}
+            to={appPath(`/incidents/${incident.id}`)}
             className="inline-flex items-center gap-2 border-2 border-ink bg-ink px-4 py-2.5 text-meta font-bold uppercase tracking-wide text-paper transition-colors duration-150 ease-linear hover:border-accent hover:bg-accent"
           >
             Open investigation
@@ -167,7 +168,7 @@ export default function Overview() {
       const result = await api.startIncident({ scenario })
       incidents.reload()
       refresh()
-      navigate(`/incidents/${result.incident.id}`)
+      navigate(appPath(`/incidents/${result.incident.id}`))
     } finally {
       setStarting(null)
     }
@@ -253,7 +254,7 @@ export default function Overview() {
               </div>
               {status?.running && status.active_incident_id ? (
                 <Link
-                  to={`/incidents/${status.active_incident_id}`}
+                  to={appPath(`/incidents/${status.active_incident_id}`)}
                   className="inline-flex shrink-0 items-center gap-2 border-2 border-accent bg-accent px-4 py-2.5 text-meta font-bold uppercase tracking-wide text-paper transition-colors duration-150 ease-linear hover:border-ink hover:bg-ink"
                 >
                   <span aria-hidden className="h-2 w-2 animate-pulse-slow bg-paper" />
@@ -356,7 +357,7 @@ export default function Overview() {
           title="Latest incident"
           action={
             <Link
-              to="/incidents"
+              to={appPath('/incidents')}
               className="inline-flex items-center gap-1.5 text-label font-bold uppercase tracking-widest text-status-idle transition-colors hover:text-accent"
             >
               All incidents
@@ -428,7 +429,7 @@ export default function Overview() {
                 : 'No memory operations have failed.'}
             </p>
             <Link
-              to="/memory"
+              to={appPath('/memory')}
               className="inline-flex items-center gap-1.5 text-label font-bold uppercase tracking-widest text-status-idle transition-colors hover:text-accent"
             >
               Inspect memory
@@ -456,7 +457,7 @@ export default function Overview() {
                 </div>
               </div>
               <Link
-                to={`/incidents/${status.active_incident_id}`}
+                to={appPath(`/incidents/${status.active_incident_id}`)}
                 className="inline-flex items-center gap-2 border-2 border-accent px-4 py-2 text-meta font-bold uppercase tracking-wide text-accent transition-colors hover:bg-accent hover:text-paper"
               >
                 Follow

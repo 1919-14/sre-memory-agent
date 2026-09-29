@@ -14,6 +14,7 @@ import {
 } from '../lib/format'
 import { useApi } from '../lib/hooks'
 import { scenarioOf } from '../lib/run'
+import { appPath } from '../lib/site'
 import { useRefreshAfter, useSystem } from '../lib/system'
 import { Page } from '../components/AppShell'
 import { ActivityStream } from '../components/ActivityStream'
@@ -100,7 +101,7 @@ export default function IncidentDetail() {
       // finished run under the new id for a frame would misattribute it.
       incident.setData(null)
       refresh()
-      navigate(`/incidents/${result.incident.id}`)
+      navigate(appPath(`/incidents/${result.incident.id}`))
     } catch {
       // The status strip reports backend errors; a refused start needs no second banner.
     } finally {
@@ -121,7 +122,7 @@ export default function IncidentDetail() {
     return (
       <Page className="space-y-8">
         <Link
-          to="/incidents"
+          to={appPath('/incidents')}
           className="inline-flex items-center gap-2 text-label font-bold uppercase tracking-widest text-status-idle transition-colors hover:text-accent"
         >
           <ArrowLeft size={12} strokeWidth={3} aria-hidden />
@@ -154,7 +155,7 @@ export default function IncidentDetail() {
       {/* ── header ───────────────────────────────────────────── */}
       <header>
         <Link
-          to="/incidents"
+          to={appPath('/incidents')}
           className="inline-flex items-center gap-2 text-label font-bold uppercase tracking-widest text-status-idle transition-colors hover:text-accent"
         >
           <ArrowLeft size={12} strokeWidth={3} aria-hidden />

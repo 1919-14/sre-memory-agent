@@ -26,6 +26,7 @@
 #   HF_GIT_USER      user part of the remote URL   (default: the Space's owner)
 #   ALLOW_DIRTY=1    publish with uncommitted changes present
 #   ALLOW_LARGE=1    publish a file larger than the 10 MiB guard
+#   PUBLISH_SCREENSHOTS=1  publish the dashboard screenshots with the Space (default: no)
 
 set -euo pipefail
 
@@ -98,6 +99,15 @@ git add -f web/dist
 [ -d data/runs ] && git add -f data/runs
 # Continuous integration belongs to the source repository, not to the deployment snapshot.
 git rm -r -q --cached .github 2>/dev/null || true
+
+# The dashboard screenshots are binaries, and the Space does not need to carry them: the landing
+# page reads them from this repository instead (see web/src/lib/site.ts). `web/dist` is force-added
+# above, so the copies Vite made of them have to go too — otherwise the same bytes would be
+# smuggled into the snapshot through the build artefact.
+if [ "${PUBLISH_SCREENSHOTS:-0}" != "1" ]; then
+  git rm -r -q --cached --ignore-unmatch web/public/screenshots web/dist/screenshots >/dev/null 2>&1 || true
+  log "screenshots excluded from the snapshot (PUBLISH_SCREENSHOTS=1 includes them)"
+fi
 
 # Space metadata lives at the snapshot root. These are injected straight into the snapshot
 # index — the working tree is never written to, so this repository's own README.md and root

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { Page } from '../components/AppShell'
 import { Empty, Panel, SectionHeader } from '../components/primitives'
+import { appPath } from '../lib/site'
 
 export default function NotFound() {
   return (
@@ -15,7 +16,7 @@ export default function NotFound() {
           detail="The page may have been moved, or the link may be wrong."
           action={
             <Link
-              to="/"
+              to={appPath()}
               className="mt-2 inline-flex items-center border-2 border-ink bg-ink px-4 py-2.5 text-meta font-bold uppercase tracking-wide text-paper transition-colors duration-150 ease-linear hover:border-accent hover:bg-accent"
             >
               Back to overview
