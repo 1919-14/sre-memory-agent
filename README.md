@@ -354,10 +354,13 @@ The agent never executes arbitrary shell against production.
   daemon `DOCKER_HOST` names, local or remote (`SANDBOX_COPY_REPO`, on by default, streams
   the workspace in for daemons that cannot see this filesystem; a remote daemon forces it).
   Which one is in force is always reported: the dashboard shows `Isolated` or `Local
-  fallback`, and the latter degrades the overall agent status, because container isolation is
-  part of what this agent guarantees about code it wrote itself. The image is also checked
-  for the ability to run pytest, so a tag that exists but cannot run this project's suites is
-  reported as a misconfiguration instead of surfacing as broken code.
+  fallback`, the status strip names the missing guarantee (`DEGRADED · SANDBOX`), and the
+  card quotes the reason the sandbox itself gives — an unexplained "degraded" is
+  indistinguishable from a broken agent. The local fallback still degrades the overall agent
+  status, because container isolation is part of what this agent guarantees about code it
+  wrote itself. The image is also checked for the ability to run pytest, so a tag that exists
+  but cannot run this project's suites is reported as a misconfiguration instead of surfacing
+  as broken code.
 * Patches are validated deterministically before execution: path allowlist and denylist,
   traversal rejection, size caps, secret detection.
 * A review gate blocks execution on critical findings — hardcoded credentials, shell

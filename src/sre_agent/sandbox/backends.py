@@ -165,7 +165,12 @@ class DockerBackend(TestBackend):
         except (OSError, subprocess.TimeoutExpired) as exc:
             return False, f"docker info failed: {exc}"
         if proc.returncode != 0:
-            return False, "Docker daemon is not running"
+            # The endpoint is part of the message: on a host that has the CLI but no daemon
+            # (a Space), "not running" alone leaves the operator guessing which daemon was
+            # tried — and the fix is to point DOCKER_HOST somewhere that answers.
+            lines = [line for line in (proc.stderr or "").strip().splitlines() if line.strip()]
+            reason = lines[-1] if lines else "docker info failed"
+            return False, f"Docker daemon is not reachable at {self.daemon_endpoint()}: {reason}"
         return True, f"Docker {proc.stdout.strip()}"
 
     def image_exists(self) -> bool:
@@ -210,7 +215,11 @@ class DockerBackend(TestBackend):
         if proc.returncode != 0:
             lines = [line for line in (proc.stderr or "").strip().splitlines() if line.strip()]
             reason = lines[-1] if lines else "no output"
-            return False, f"image {self.image!r} cannot import pytest ({reason})"
+            return False, (
+                f"image {self.image!r} cannot import pytest ({reason}); build "
+                f"{SANDBOX_IMAGE_DEFAULT} from docker/sandbox.Dockerfile and point "
+                "SANDBOX_IMAGE at it"
+            )
         return True, f"image {self.image}"
 
     def daemon_endpoint(self) -> str:
