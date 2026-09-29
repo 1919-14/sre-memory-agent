@@ -71,14 +71,27 @@ presented as live when it is not.
   Runs are marked `simulated`.
 - **Live mode** — set `GROQ_API_KEY` in *Settings → Variables and secrets*. The agent then
   reasons live, generates patches, and grades its own work.
-- **Memory** — Hindsight is an external service, so this Space cannot run it. Provide
-  `HINDSIGHT_API_KEY` (and optionally `HINDSIGHT_BASE_URL`) to connect hosted memory; without
-  it the agent reports memory as **unavailable** and runs degraded rather than pretending.
+- **Memory runs inside this Space.** Hindsight is started in the same container
+  (`hindsight-all` with embedded PostgreSQL, no Docker and no external service), with its
+  database and embedding-model cache under `/data`, so what the agent learns survives a
+  restart. It needs `GROQ_API_KEY`, because Hindsight extracts memories with an LLM; without
+  one the agent reports memory as **unavailable** rather than pretending. Point
+  `HINDSIGHT_BASE_URL` at a hosted Hindsight to use that instead.
+- **The first start is slow.** Initialising PostgreSQL and downloading the embedding models
+  takes a few minutes; every start after that reuses `/data`. If the memory server is still
+  starting when the API comes up, the agent connects on a later check instead of needing a
+  restart.
 - **Sandbox** — a Space has no Docker daemon, so generated code runs in the local
   temporary-workspace backend instead of a container. The dashboard reports this as a
   degradation. A container-isolated sandbox needs the self-hosted setup in the repository.
 
-Incident history is written to `/data`, which Spaces preserve across restarts.
+Incident history, the recording and model caches, and the memory database are all written
+under `/data`, which a Space preserves across restarts.
+
+On a free Groq plan the memory layer's own extraction calls share the per-minute token budget
+with the agent's reasoning, so a long demo can be slow, and `reflect` (the runbook mental
+model) does not fit in that budget at all. The repository's `HINDSIGHT.md` has the measured
+numbers; the repair loop itself only needs retain and recall.
 
 ## Links
 

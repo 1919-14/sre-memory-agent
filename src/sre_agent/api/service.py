@@ -77,27 +77,17 @@ class AgentService:
         self._last_error: str | None = None
         self.warnings: list[str] = []
         self.notes: list[str] = []
+        self._memory_ready = False
+        self._memory_retry_at = 0.0
+
+    # Minimum gap between attempts to reach a memory server that was absent at startup.
+    _MEMORY_RETRY_SECONDS = 30.0
 
     # ── lifecycle ───────────────────────────────────────────
     def startup(self) -> None:
         self.warnings = []
         self.notes = []
-        reachable, detail = self.memory.health()
-        if reachable:
-            try:
-                self.memory.ensure_banks()
-                # A healthy fact, deliberately not a warning.
-                self.notes.append(
-                    f"Hindsight ready at {self.settings.hindsight_base_url} "
-                    f"(banks: {self.memory.incident_bank}, {self.memory.convention_bank})"
-                )
-            except MemoryStoreError as exc:
-                self.warnings.append(f"Hindsight reachable but bank setup failed: {exc}")
-        else:
-            self.warnings.append(
-                f"Hindsight unavailable ({detail}). The agent runs degraded: no historical "
-                "memory is used and nothing is learned."
-            )
+        self._bootstrap_memory()
         agent = self.agent()
         self.warnings.extend(agent.prepare())
         self.settings.ensure_dirs()
@@ -109,6 +99,45 @@ class AgentService:
             "; ".join(self.notes) or "all dependencies available",
             warning_suffix,
         )
+
+    def _bootstrap_memory(self) -> bool:
+        """Connect to Hindsight and create the banks if they are missing.
+
+        Separate from `startup` because the memory server can legitimately arrive *after* the
+        agent: a self-hosted Hindsight still loading its models, or a single-container
+        deployment that starts both processes together. Re-running this from `status` means the
+        agent connects once the server is actually up, instead of reporting a degraded memory
+        layer until the next restart.
+
+        Entries this method owns are rebuilt on every attempt, so a stale "unavailable" can
+        never outlive the condition it described.
+        """
+        self._memory_ready = False
+        self.notes = [note for note in self.notes if not note.startswith("Hindsight ready")]
+        self.warnings = [
+            warning
+            for warning in self.warnings
+            if not warning.startswith(("Hindsight unavailable", "Hindsight reachable"))
+        ]
+        reachable, detail = self.memory.health()
+        if not reachable:
+            self.warnings.append(
+                f"Hindsight unavailable ({detail}). The agent runs degraded: no historical "
+                "memory is used and nothing is learned."
+            )
+            return False
+        try:
+            self.memory.ensure_banks()
+        except MemoryStoreError as exc:
+            self.warnings.append(f"Hindsight reachable but bank setup failed: {exc}")
+            return False
+        # A healthy fact, deliberately not a warning.
+        self.notes.append(
+            f"Hindsight ready at {self.settings.hindsight_base_url} "
+            f"(banks: {self.memory.incident_bank}, {self.memory.convention_bank})"
+        )
+        self._memory_ready = True
+        return True
 
     def agent(self) -> SREAgent:
         if self._agent is None:
@@ -178,6 +207,10 @@ class AgentService:
 
     # ── status ──────────────────────────────────────────────
     def status(self) -> AgentStatus:
+        if not self._memory_ready and time.monotonic() >= self._memory_retry_at:
+            # Bounded so a genuinely absent server is not probed on every poll.
+            self._memory_retry_at = time.monotonic() + self._MEMORY_RETRY_SECONDS
+            self._bootstrap_memory()
         reachable, detail = self.memory.health()
         repo_present = GitRepo(self.settings.repo_dir).is_repo()
         sandbox = SandboxExecutor(self.settings)

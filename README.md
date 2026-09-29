@@ -206,12 +206,16 @@ cd web && npm ci && npm run build && cd ..
 SPACE=vssksn/sre-memory-agent HF_TOKEN=hf_xxx bash deploy/huggingface/sync.sh
 ```
 
-**The Space is configured to stay honest about what it cannot do.** A Space has no Docker
-daemon, so `entrypoint.sh` selects the local sandbox backend and the dashboard reports the
-missing container isolation as a degradation. Hindsight is external, so without
-`HINDSIGHT_API_KEY` memory is reported unavailable rather than faked. And without
-`GROQ_API_KEY` the demo falls back to re-rendering recorded trajectories, which the UI marks
-`simulated`. Add those keys as Space secrets to run the agent live.
+**The Space runs the memory layer itself.** Because a Space gets one container and no second
+host, `entrypoint.sh` starts a Hindsight server alongside the API: `hindsight-all` with
+embedded PostgreSQL, its database and embedding-model cache under `/data` so memory survives
+a restart. It requires `GROQ_API_KEY`, since Hindsight extracts memories with an LLM (the
+image sizes are the cost — that package bundles PostgreSQL and the embedding models).
+
+**The sandbox is the one honest exception.** A Space has no Docker daemon, so generated code
+runs in the local temporary-workspace backend and the dashboard reports the missing container
+isolation as a degradation. And without `GROQ_API_KEY` the demo falls back to re-rendering
+recorded trajectories, which the UI marks `simulated`.
 
 ---
 
