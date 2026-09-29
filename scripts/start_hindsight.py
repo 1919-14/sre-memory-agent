@@ -12,12 +12,15 @@ Then, in another terminal:
 
 Leave this process running. Ctrl+C stops the server; data persists in the local `pg0`
 store, so the agent keeps whatever it has learned.
+
+The order of the three steps in `main` is not cosmetic — Hindsight reads its configuration
+and its database URL at import time, so both have to exist before `hindsight` is imported.
+`src/sre_agent/memory/embedded.py` explains what goes wrong otherwise.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import signal
 import sys
 import time
@@ -28,6 +31,12 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from sre_agent.config import settings  # noqa: E402
 from sre_agent.logging_setup import configure_stdout  # noqa: E402
+from sre_agent.memory.embedded import (  # noqa: E402
+    configure_embedded_env,
+    ensure_embedded_database,
+    stop_embedded_database,
+    verify_embedded_env,
+)
 
 
 def main() -> int:
@@ -37,6 +46,11 @@ def main() -> int:
     parser.add_argument("--model", default=settings.hindsight_api_llm_model)
     parser.add_argument("--provider", default=settings.hindsight_api_llm_provider)
     parser.add_argument("--log-level", default="info")
+    parser.add_argument(
+        "--db-url",
+        default="",
+        help="use an existing PostgreSQL (postgresql://...) instead of starting embedded pg0",
+    )
     args = parser.parse_args()
 
     configure_stdout()
@@ -50,6 +64,27 @@ def main() -> int:
         )
         return 2
 
+    # Step 1 — the environment. This has to happen before `hindsight` is imported anywhere:
+    # the library snapshots the environment when it first parses it, so a variable set after
+    # the import is ignored (and Groq then rejects the default `service_tier: auto`).
+    configure_embedded_env(settings)
+
+    # Step 2 — the database. Started explicitly so that a pg0 failure is reported as a pg0
+    # failure, and Hindsight receives a real DSN instead of the magic "pg0" string.
+    if args.db_url:
+        db_url = args.db_url
+    else:
+        try:
+            db_url = ensure_embedded_database()
+        except RuntimeError as exc:
+            print(f"Embedded PostgreSQL is unavailable: {exc}", file=sys.stderr)
+            print(
+                "Hindsight needs a database. Pass --db-url to use an existing PostgreSQL, "
+                "or use Hindsight Cloud by pointing HINDSIGHT_BASE_URL at it.",
+                file=sys.stderr,
+            )
+            return 2
+
     try:
         from hindsight import HindsightServer
     except ImportError:
@@ -60,20 +95,18 @@ def main() -> int:
         )
         return 2
 
-    # Hindsight defaults this to "auto", which Groq rejects with HTTP 400 on plans that
-    # do not include that tier. It must be set before the server reads its config.
-    os.environ.setdefault(
-        "HINDSIGHT_API_LLM_GROQ_SERVICE_TIER", settings.hindsight_api_llm_groq_service_tier
-    )
+    # Step 3 — confirm the library saw the configuration, rather than assuming it did.
+    verify_embedded_env(settings.hindsight_api_llm_groq_service_tier)
 
     print("Starting embedded Hindsight (embedded PostgreSQL, Groq extraction)...")
     print(f"  provider : {args.provider}")
     print(f"  model    : {args.model}")
+    print(f"  database : {'external, ' + db_url if args.db_url else 'embedded PostgreSQL'}")
     print(f"  url      : http://{args.host}:{args.port}")
     print("First start initialises a local database and can take a minute.\n")
 
     server = HindsightServer(
-        db_url="pg0",
+        db_url=db_url,
         llm_provider=args.provider,
         llm_api_key=api_key,
         llm_model=args.model,
@@ -106,6 +139,8 @@ def main() -> int:
             server.stop(timeout=30.0)
         except Exception as exc:  # noqa: BLE001
             print(f"Shutdown warning: {exc}", file=sys.stderr)
+        if not args.db_url:
+            stop_embedded_database()
         print("Hindsight stopped.")
     return 0
 

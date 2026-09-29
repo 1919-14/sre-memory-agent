@@ -422,19 +422,46 @@ by reading docs, and `src/sre_agent/memory/store.py` is written to the real sign
 | Memory Defense | `memory_defense` is a free-form dict on the bank config, not a typed model. Applied defensively and the result is reported as observed, never assumed. |
 | Other capabilities present | `observations`, mental models, knowledge pages, `export`/`import`, webhooks, per-bank MCP endpoint |
 
-### Running Hindsight locally: two real blockers
+### Running Hindsight locally: three real blockers
 
-Both were hit while wiring the memory layer. They are **environment/plan limits, not application
-defects**, and the agent reports either one as a degraded run rather than pretending memory worked.
+All three were hit while wiring the memory layer; the first two booted on a public Hugging Face
+Space, where the boot log is the only evidence available. They are **environment limits and
+upstream quirks, not application defects**, and the agent reports a degraded run rather than
+pretending memory worked.
 
-**1. `service_tier` rejected by Groq.** Hindsight sends `service_tier: auto` on its own
-retain/reflect calls. Groq returns HTTP 400 (`"service_tier" "auto" is not available for this
-org`) on plans that do not include it. Fixes applied: `HINDSIGHT_API_LLM_GROQ_SERVICE_TIER=on_demand`
-(verified to work for `reflect`), plus `HINDSIGHT_API_RETAIN_LLM_EXTRA_BODY` /
-`HINDSIGHT_API_CONSOLIDATION_LLM_EXTRA_BODY` for the per-task paths. In testing the extraction
-path still sent `auto` despite the documented override — a Hindsight-side quirk to track upstream.
+**1. `service_tier` rejected by Groq.** Hindsight sends `service_tier: auto` on its own calls.
+Groq returns HTTP 400 (`"service_tier" "auto" is not available for this org`) on plans that do
+not include that tier. Pinning `HINDSIGHT_API_LLM_GROQ_SERVICE_TIER=on_demand` looks like the
+whole fix, and is not: **`hindsight_api` snapshots the environment the first time it parses it**,
+so a variable set *after* `import hindsight` is ignored and `auto` still goes on the wire. That is
+precisely what the Space did — the launcher set the variable a few lines below its
+`from hindsight import HindsightServer`, so every boot logged three 400s with
+`scope=verification` (the first call the server makes) and then started anyway with LLM operations
+broken. Verified in one interpreter: with the import first,
+`get_config().llm_groq_service_tier == "auto"`; with the variable set first, `"on_demand"`.
 
-**2. Free-tier token ceiling.** A free Groq plan allows ~8,000 tokens/minute. A single
+The fix is therefore ordering, not another variable: `configure_embedded_env()` runs before the
+import in both entry points, and it now also sets `HINDSIGHT_API_LLM_EXTRA_BODY` — the *global*
+body, which is what the default config (LLM verification included) uses — alongside the four
+per-task bodies for retain/reflect/consolidation/mental-model refresh.
+`verify_embedded_env()` then logs the tier the library actually resolved, so this cannot return
+silently.
+
+**2. The embedded database URL.** Hindsight can start its own PostgreSQL from the magic string
+`db_url="pg0"`, and that is how the Space was launched. That path cannot be relied on:
+`MemoryEngine.initialize()` does `self.db_url = await pg0.ensure_running()`, and
+`ensure_running()` returns `Pg0.start()`'s `info()` — whose `uri` field the pg0 CLI **omits
+entirely while the instance is stopped** (verified on the bundled 0.15.2 binary:
+`pg0 info --name hindsight -o json` reports `running: false` and no `uri` key at all). A
+`pg0 start` that returns 0 before the server accepts connections therefore assigns `None`, and the
+failure surfaces several steps later as `ValueError: Database URL is required for migrations` — a
+message that names neither pg0 nor the database, from a traceback that reads like a migrations
+bug. `ensure_embedded_database()` now starts pg0 itself, waits until it reports `running`, builds
+the DSN from `uri` or from its parts (`postgresql://hindsight:hindsight@127.0.0.1:<port>/hindsight`)
+and hands Hindsight a plain URL, which keeps it away from pg0 entirely. A pg0 failure now reports
+pg0's own message and points at `pg0 logs --name hindsight`.
+
+**3. Free-tier token ceiling.** A free Groq plan allows ~8,000 tokens/minute. A single
 `reflect` call requested **5,179 tokens** against a budget already at 6,843, so it cannot fit —
 retrying does not help, because each attempt consumes from the same window. Options, in order of preference:
 
@@ -483,6 +510,6 @@ learning loop is confirmed end to end. Two behaviours were fixed as a result of 
 ### Still open
 
 - [ ] Consolidation latency — how long between `retain` and usable `observations`
-- [ ] Whether the upstream `retain` service-tier pass-through is a known issue (worth a report)
+- [ ] Whether embedded PostgreSQL stays up across a Space restart (`/data` persistence of `~/.pg0`)
 - [ ] A provider with enough TPM to run `reflect`, or Hindsight Cloud, to exercise the runbook
 - [ ] Async client end-to-end (the current loop is synchronous; fine at this scale)

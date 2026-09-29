@@ -46,7 +46,10 @@ RUN pip install --no-cache-dir --upgrade pip \
 #  * `hindsight-all` pinned to the release the memory layer is verified against
 #    (`HINDSIGHT.md`) — client and server are the same version here, so they cannot drift.
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch \
-    && pip install --no-cache-dir "hindsight-all==0.10.1"
+    && pip install --no-cache-dir "hindsight-all==0.10.1" "pg0-embedded>=0.15.0"
+# `pg0-embedded` is named explicitly even though `hindsight-all` pulls it in: the launcher
+# imports it directly to start the database (see `memory/embedded.py`), so it is a real
+# dependency of this image rather than an implementation detail of a transitive extra.
 
 # Fail the build rather than silently ship a GPU-sized image if the CPU wheel did not take.
 RUN python -c "import torch, sys; sys.exit('CUDA torch build in a CPU-only image') if torch.version.cuda else 0"
