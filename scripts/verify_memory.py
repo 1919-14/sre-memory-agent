@@ -24,7 +24,12 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from sre_agent.config import settings  # noqa: E402
 from sre_agent.logging_setup import configure_stdout, get_logger, setup_logging  # noqa: E402
 from sre_agent.memory import MemoryStore, MemoryStoreError  # noqa: E402
-from sre_agent.memory.embedded import configure_embedded_env  # noqa: E402
+from sre_agent.memory.embedded import (  # noqa: E402
+    configure_embedded_env,
+    ensure_embedded_database,
+    stop_embedded_database,
+    verify_embedded_env,
+)
 
 log = get_logger("verify-memory")
 
@@ -58,6 +63,22 @@ def main() -> int:
         # Docker or Cloud is already serving this URL; verify against it and leave it up.
         print(f"Using the Hindsight server already running at {settings.hindsight_base_url}")
     else:
+        # Configuration first, and before `hindsight` is imported: the library snapshots the
+        # environment when it parses it, and the database has to exist before Hindsight reads
+        # its URL. `memory/embedded.py` documents what both orderings cost.
+        applied = configure_embedded_env(settings)
+        if applied:
+            print("Configured Hindsight LLM overrides:")
+            for key, value in applied.items():
+                print(f"  {key} = {value}")
+            print()
+
+        try:
+            db_url = ensure_embedded_database()
+        except RuntimeError as exc:
+            print(f"Embedded PostgreSQL is unavailable: {exc}")
+            return 2
+
         try:
             from hindsight import HindsightServer
         except ImportError:
@@ -69,16 +90,11 @@ def main() -> int:
             print("Or install the embedded one: pip install hindsight-all")
             return 2
 
-        applied = configure_embedded_env(settings)
-        if applied:
-            print("Configured Hindsight LLM overrides:")
-            for key, value in applied.items():
-                print(f"  {key} = {value}")
-            print()
+        verify_embedded_env(settings.hindsight_api_llm_groq_service_tier)
 
         print("Starting embedded Hindsight (first run initialises a local database)...")
         server = HindsightServer(
-            db_url="pg0",
+            db_url=db_url,
             llm_provider=settings.hindsight_api_llm_provider,
             llm_api_key=settings.groq_api_key,
             llm_model=settings.hindsight_api_llm_model,
@@ -242,6 +258,9 @@ def main() -> int:
                 server.stop(timeout=30.0)
             except Exception as exc:  # noqa: BLE001
                 print(f"Shutdown warning: {exc}")
+            # Only ever reached on the embedded path: stopping the database we started keeps
+            # the data directory clean for the next run.
+            stop_embedded_database()
 
 
 if __name__ == "__main__":

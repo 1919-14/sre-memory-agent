@@ -75,8 +75,13 @@ presented as live when it is not.
   (`hindsight-all` with embedded PostgreSQL, no Docker and no external service), with its
   database and embedding-model cache under `/data`, so what the agent learns survives a
   restart. It needs `GROQ_API_KEY`, because Hindsight extracts memories with an LLM; without
-  one the agent reports memory as **unavailable** rather than pretending. Point
-  `HINDSIGHT_BASE_URL` at a hosted Hindsight to use that instead.
+  one the agent reports memory as **unavailable** rather than pretending.
+- **Or let Hindsight Cloud hold the memory.** Set `HINDSIGHT_API_KEY` (from the dashboard's
+  *Connect* → *Create API Key*) and leave `HINDSIGHT_BASE_URL` unset: the agent then talks to
+  `https://api.hindsight.vectorize.io` and the in-container server is skipped. That removes the
+  embedded-PostgreSQL boot, the first-start model download, and the free-tier ceiling on the
+  memory layer's own extraction calls. `HINDSIGHT_BASE_URL` can also point at any other
+  Hindsight you run, if you would rather not use the managed one.
 - **The first start is slow.** Initialising PostgreSQL and downloading the embedding models
   takes a few minutes; every start after that reuses `/data`. If the memory server is still
   starting when the API comes up, the agent connects on a later check instead of needing a

@@ -58,6 +58,21 @@ Managed, usage-based, 99.9% SLA, dashboard + backups. Point clients at `https://
 with an API key. Promo code **`MEMHACK99`** gives $50 credits — **applied in the billing section AFTER
 registering**, not at signup.
 
+**Getting the key:** sign up at `ui.hindsight.vectorize.io`, create an organization, then
+**Connect → Create API Key** and copy it immediately (it is shown once). Nothing needs to be created
+by hand afterwards — `MemoryStore.ensure_banks` creates the incident and convention banks it needs,
+and the client is version-matched to the server (`hindsight-client==0.10.1`), so there is no schema
+drift between the local and hosted paths.
+
+**On the Space, switching to Cloud is a one-secret change:** set `HINDSIGHT_API_KEY` and leave
+`HINDSIGHT_BASE_URL` unset. `entrypoint.sh` reads the key as the signal to use the hosted API and
+skips the in-container server entirely — which is why the image deliberately does *not* preset
+`HINDSIGHT_BASE_URL`: a default there would make "no URL configured" impossible to express, and a
+key would silently keep pointing at the local server. Beyond skipping embedded PostgreSQL and its
+first-start model download, this also moves the memory layer's own extraction calls onto Vectorize's
+inference instead of the Space's free Groq tier — the only arrangement in which `reflect` (and so
+the runbook) fits inside a token window.
+
 ### Option B — Docker (recommended for local dev)
 
 ```bash

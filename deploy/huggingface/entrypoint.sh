@@ -53,12 +53,18 @@ fi
 export SANDBOX_BACKEND="${SANDBOX_BACKEND:-local}"
 
 # Memory defaults to the server in this container (step 4) — that is what a self-contained
-# deployment needs, and what the image is built for. Pointing HINDSIGHT_BASE_URL at a hosted
-# Hindsight is the opt-in: with an API key and no URL configured, the hosted API is used.
-if [ -z "${HINDSIGHT_BASE_URL:-}" ] && [ -n "${HINDSIGHT_API_KEY:-}" ]; then
+# deployment needs, and what the image is built for. Moving it out is one secret: with
+# HINDSIGHT_API_KEY set and no HINDSIGHT_BASE_URL, Hindsight Cloud is used and step 4 is
+# skipped entirely. That is why the image does not preset HINDSIGHT_BASE_URL: presetting it
+# would make "no URL configured" — the signal for Cloud — impossible to express, and a key
+# alone would silently keep pointing at the in-container server.
+if [ -n "${HINDSIGHT_API_KEY:-}" ] && [ -z "${HINDSIGHT_BASE_URL:-}" ]; then
   export HINDSIGHT_BASE_URL="https://api.hindsight.vectorize.io"
-  log "HINDSIGHT_API_KEY set with no base URL: using hosted memory at $HINDSIGHT_BASE_URL"
+  log "HINDSIGHT_API_KEY is set: using hosted memory at $HINDSIGHT_BASE_URL"
 fi
+# Every path from here gives the API a concrete address: `localhost` can resolve to ::1 first,
+# and a refused connection there reads as a broken memory layer rather than a missing one.
+export HINDSIGHT_BASE_URL="${HINDSIGHT_BASE_URL:-http://127.0.0.1:8888}"
 
 # No LLM key means there is nothing to reason with, so the demo falls back to re-rendering
 # recorded trajectories. Those runs are labelled `simulated` end to end, and the dashboard
@@ -77,7 +83,7 @@ fi
 #   * it stores its database in $HOME/.pg0, so HOME points under /data and memory survives a
 #     restart — along with the embedding-model cache, which would otherwise be re-downloaded
 #     on every boot.
-case "${HINDSIGHT_BASE_URL:-http://127.0.0.1:8888}" in
+case "$HINDSIGHT_BASE_URL" in
   *localhost* | *127.0.0.1* | *0.0.0.0*)
     if [ -z "${GROQ_API_KEY:-}" ]; then
       log "no GROQ_API_KEY: memory server skipped (Hindsight extracts memories with an LLM)"
@@ -126,7 +132,7 @@ case "${HINDSIGHT_BASE_URL:-http://127.0.0.1:8888}" in
     fi
     ;;
   *)
-    log "using the configured Hindsight at $HINDSIGHT_BASE_URL"
+    log "using the configured Hindsight at $HINDSIGHT_BASE_URL (no in-container server)"
     ;;
 esac
 

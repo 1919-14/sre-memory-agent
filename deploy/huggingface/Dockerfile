@@ -66,9 +66,13 @@ RUN useradd --uid 1000 --home-dir /data/hindsight --create-home --shell /usr/sbi
 
 # Spaces route public traffic to this port (`app_port` in the Space card matches it). The
 # memory server listens on 127.0.0.1:8888, which is deliberately not published.
+#
+# HINDSIGHT_BASE_URL is deliberately absent: `entrypoint.sh` treats "no base URL configured" as
+# the signal to use Hindsight Cloud once HINDSIGHT_API_KEY is present, and a default here would
+# make that state unreachable — setting a key would silently keep using the in-container server.
+# Without a key, the entrypoint points the agent at 127.0.0.1:8888 itself.
 ENV API_HOST=0.0.0.0 \
     API_PORT=7860 \
-    HINDSIGHT_BASE_URL=http://127.0.0.1:8888 \
     SANDBOX_BACKEND=local
 
 EXPOSE 7860
